@@ -147,7 +147,8 @@ export default function App() {
   const [srcForm, setSrcForm] = useState({ name:"", type:"card", color:C.blue, last4:"" });
   const [catForm, setCatForm] = useState({ label:"", emoji:"🏷️" });
   const [cycleForm, setCycleForm] = useState({ sourceId:"", budget:"", startDate:"", endDate:"" });
-  const [editCycle, setEditCycle] = useState(null); // { id, budget, startDate, endDate }
+  const [editCycle,  setEditCycle]  = useState(null);
+  const [editSource, setEditSource] = useState(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(""),2200); };
 
@@ -289,6 +290,20 @@ export default function App() {
     await sb.patch("recurring_expenses",r.id,{ last_applied:today() });
     await loadAll();
     showToast("Gasto aplicado ✓");
+  };
+
+  const updateSource = async () => {
+    if(!editSource||!editSource.name.trim()) return;
+    await sb.patch("sources", editSource.id, { name:editSource.name, color:editSource.color, last4:editSource.last4||null, icon:editSource.type==="cash"?"💵":"💳" });
+    setEditSource(null);
+    await loadAll();
+    showToast("Fuente actualizada ✓");
+  };
+
+  const deleteSource = async (id) => {
+    await sb.del("sources", id);
+    await loadAll();
+    showToast("Fuente eliminada ✓");
   };
 
   const addSource = async () => {
@@ -609,16 +624,39 @@ export default function App() {
         const history=cycles.filter(c=>c.source_id===s.id&&c.closed);
         return (
           <div key={s.id} style={S.card}>
+            {editSource?.id===s.id ? (
+              <div>
+                <label style={S.label}>Nombre</label>
+                <input style={{...S.input,marginBottom:10}} value={editSource.name} onChange={e=>setEditSource(f=>({...f,name:e.target.value}))}/>
+                {editSource.type==="card"&&(<>
+                  <label style={S.label}>Últimos 4 dígitos</label>
+                  <input style={{...S.input,marginBottom:10}} maxLength={4} value={editSource.last4||""} onChange={e=>setEditSource(f=>({...f,last4:e.target.value}))}/>
+                </>)}
+                <label style={S.label}>Color</label>
+                <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+                  {PALETTE.map(col=>(
+                    <button key={col} onClick={()=>setEditSource(f=>({...f,color:col}))} style={{width:26,height:26,borderRadius:"50%",background:col,border:"none",cursor:"pointer",outline:editSource.color===col?`3px solid ${C.white}`:"none",outlineOffset:2}}/>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button style={S.btn(C.green,true)} onClick={updateSource}>Guardar</button>
+                  <button style={S.btn(C.muted)} onClick={()=>setEditSource(null)}>Cancelar</button>
+                </div>
+              </div>
+            ) : (
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
               <span style={{fontSize:20}}>{s.icon}</span>
               <div style={{flex:1}}>
                 <div style={{fontWeight:700,fontSize:14}}>{s.name}</div>
                 <div style={{fontSize:11,color:C.muted}}>{s.type==="card"?`Tarjeta ••${s.last4||"----"}`:"Efectivo"}</div>
               </div>
-              <span style={{fontWeight:800}}>{fmt(spent)}</span>
+              <span style={{fontWeight:800,marginRight:6}}>{fmt(spent)}</span>
+              <button style={{...S.del,fontSize:14}} onClick={()=>setEditSource({id:s.id,name:s.name,color:s.color,last4:s.last4||"",type:s.type})}>✏️</button>
+              <button style={{...S.del,fontSize:14,color:C.coral}} onClick={()=>deleteSource(s.id)}>🗑</button>
             </div>
+            )}
 
-            {s.type==="card"&&(
+            {s.type==="card"&&editSource?.id!==s.id&&(
               <>
                 {cyc?(
                   editCycle?.id===cyc.id?(
